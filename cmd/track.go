@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 )
 
@@ -15,27 +20,74 @@ var trackCmd = &cobra.Command{
 	ip and to strart the trace; Example: 
 		track 8.8.8.4.4`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("track called")
 		if len(args) == 0 {
-			fmt.Println("informe um ip")
+			fmt.Println("Inform an IP address")
 		}
 		if len(args) > 1 {
-			fmt.Println("informe apenas um ip")
+			fmt.Println("Inform only one IP address")
 		}
-		fmt.Println("Verificando ip")
+		fmt.Println("\nTracking IP...")
+		fmt.Println("")
+		fetchData(args[0])
 	},
+}
+
+type Ip struct {
+	IP       string `json:"ip"`
+	City     string `json:"city"`
+	Region   string `json:"region"`
+	Country  string `json:"country"`
+	Location string `json:"loc"`
+	Org      string `json:"org"`
+	Timezone string `json:"timezone"`
+	Postal   string `json:"postal"`
+}
+
+func fetchData(ip string) {
+	url := "http://ipinfo.io/" + ip + "/geo"
+
+	res := getData(url)
+
+	data := Ip{}
+
+	err := json.Unmarshal(res, &data)
+
+	if err != nil {
+		fmt.Println("Error decoding response")
+	}
+
+	if data.IP == "" {
+		fmt.Println("Please provide a valid IP address")
+		return
+	}
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Info", "Location", "Coords"})
+	t.AppendRows([]table.Row{
+		{data.Org, data.City},
+		{data.Postal, data.Region, data.Location},
+		{data.Timezone, data.Country},
+	})
+	t.AppendSeparator()
+	t.Render()
+}
+func getData(url string) []byte {
+	res, err := http.Get(url)
+
+	if err != nil {
+		fmt.Println("error: ", err)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		fmt.Println("error: ", err)
+	}
+	return body
+
 }
 
 func init() {
 	rootCmd.AddCommand(trackCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// trackCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// trackCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
